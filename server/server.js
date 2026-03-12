@@ -16,6 +16,8 @@ const app = express();
 const PORT = process.env.PORT || 5000;
 const JWT_SECRET = process.env.JWT_SECRET || 'change-this-secret-in-production';
 const JWT_EXPIRES_IN = process.env.JWT_EXPIRES_IN || '7d';
+const BLOOD_TYPES = ['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-'];
+const PHONE_REGEX = /^\d{10}$/;
 
 // Middleware
 app.use(cors());
@@ -210,35 +212,91 @@ function createToken(user) {
     );
 }
 
+function sendError(res, status, message, errorCode, details = null) {
+    return res.status(status).json({
+        success: false,
+        message,
+        errorCode,
+        details
+    });
+}
+
+function validateRegisterInput(body) {
+    const errors = [];
+    if (!body.name || typeof body.name !== 'string' || !body.name.trim()) errors.push('name is required');
+    if (!body.email || typeof body.email !== 'string' || !body.email.includes('@')) errors.push('valid email is required');
+    if (!body.password || typeof body.password !== 'string' || body.password.length < 6) errors.push('password must be at least 6 characters');
+    if (body.role && !['admin', 'staff'].includes(body.role)) errors.push('role must be admin or staff');
+    return errors;
+}
+
+function validateLoginInput(body) {
+    const errors = [];
+    if (!body.email || typeof body.email !== 'string' || !body.email.includes('@')) errors.push('valid email is required');
+    if (!body.password || typeof body.password !== 'string') errors.push('password is required');
+    return errors;
+}
+
+function validateDonorInput(body) {
+    const errors = [];
+    if (!body.name || !String(body.name).trim()) errors.push('name is required');
+    if (!Number.isFinite(Number(body.age)) || Number(body.age) < 18 || Number(body.age) > 65) errors.push('age must be between 18 and 65');
+    if (!BLOOD_TYPES.includes(body.bloodType)) errors.push('invalid bloodType');
+    if (!PHONE_REGEX.test(String(body.phone || ''))) errors.push('phone must be 10 digits');
+    if (!body.address || !String(body.address).trim()) errors.push('address is required');
+    return errors;
+}
+
+function validateRequestInput(body) {
+    const errors = [];
+    if (!body.patientName || !String(body.patientName).trim()) errors.push('patientName is required');
+    if (!BLOOD_TYPES.includes(body.bloodType)) errors.push('invalid bloodType');
+    if (!Number.isFinite(Number(body.units)) || Number(body.units) < 1) errors.push('units must be at least 1');
+    if (!body.hospital || !String(body.hospital).trim()) errors.push('hospital is required');
+    if (!body.contactPerson || !String(body.contactPerson).trim()) errors.push('contactPerson is required');
+    if (!PHONE_REGEX.test(String(body.contactPhone || ''))) errors.push('contactPhone must be 10 digits');
+    if (!['Critical', 'Urgent', 'Normal'].includes(body.urgency)) errors.push('urgency must be Critical, Urgent or Normal');
+    return errors;
+}
+
+function validateInventoryUpdateInput(body, bloodType) {
+    const errors = [];
+    if (!BLOOD_TYPES.includes(bloodType)) errors.push('invalid bloodType');
+    if (!Number.isFinite(Number(body.units)) || Number(body.units) < 0) errors.push('units must be a non-negative number');
+    return errors;
+}
+
+function escapeRegex(value) {
+    return String(value).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+function getPagination(req) {
+    const page = Math.max(1, parseInt(req.query.page || '1', 10));
+    const limit = Math.min(100, Math.max(1, parseInt(req.query.limit || '10', 10)));
+    const skip = (page - 1) * limit;
+    return { page, limit, skip };
+}
+
 function authenticateToken(req, res, next) {
     const authHeader = req.headers.authorization || '';
     const token = authHeader.startsWith('Bearer ') ? authHeader.slice(7) : null;
 
     if (!token) {
-        return res.status(401).json({
-            success: false,
-            message: 'Authentication token is required'
-        });
+        return sendError(res, 401, 'Authentication token is required', 'AUTH_TOKEN_MISSING');
     }
 
     try {
         req.user = jwt.verify(token, JWT_SECRET);
         next();
     } catch (error) {
-        return res.status(401).json({
-            success: false,
-            message: 'Invalid or expired token'
-        });
+        return sendError(res, 401, 'Invalid or expired token', 'AUTH_TOKEN_INVALID');
     }
 }
 
 function authorizeRoles(...roles) {
     return (req, res, next) => {
         if (!req.user || !roles.includes(req.user.role)) {
-            return res.status(403).json({
-                success: false,
-                message: 'Access denied for this role'
-            });
+            return sendError(res, 403, 'Access denied for this role', 'AUTH_FORBIDDEN');
         }
         next();
     };
@@ -260,27 +318,14 @@ app.get('/', (req, res) => {
 app.post('/api/auth/register', async (req, res) => {
     try {
         const { name, email, password, role } = req.body;
-
-        if (!name || !email || !password) {
-            return res.status(400).json({
-                success: false,
-                message: 'Name, email and password are required'
-            });
-        }
-
-        if (password.length < 6) {
-            return res.status(400).json({
-                success: false,
-                message: 'Password must be at least 6 characters long'
-            });
+        const validationErrors = validateRegisterInput(req.body);
+        if (validationErrors.length > 0) {
+            return sendError(res, 400, 'Invalid registration input', 'VALIDATION_ERROR', validationErrors);
         }
 
         const existingUser = await User.findOne({ email: email.toLowerCase().trim() });
         if (existingUser) {
-            return res.status(409).json({
-                success: false,
-                message: 'User already exists with this email'
-            });
+            return sendError(res, 409, 'User already exists with this email', 'USER_ALREADY_EXISTS');
         }
 
         const passwordHash = await bcrypt.hash(password, 10);
@@ -301,38 +346,26 @@ app.post('/api/auth/register', async (req, res) => {
             }
         });
     } catch (error) {
-        res.status(400).json({
-            success: false,
-            message: 'Error registering user',
-            error: error.message
-        });
+        return sendError(res, 500, 'Error registering user', 'REGISTER_FAILED', error.message);
     }
 });
 
 app.post('/api/auth/login', async (req, res) => {
     try {
         const { email, password } = req.body;
-        if (!email || !password) {
-            return res.status(400).json({
-                success: false,
-                message: 'Email and password are required'
-            });
+        const validationErrors = validateLoginInput(req.body);
+        if (validationErrors.length > 0) {
+            return sendError(res, 400, 'Invalid login input', 'VALIDATION_ERROR', validationErrors);
         }
 
         const user = await User.findOne({ email: email.toLowerCase().trim() });
         if (!user) {
-            return res.status(401).json({
-                success: false,
-                message: 'Invalid email or password'
-            });
+            return sendError(res, 401, 'Invalid email or password', 'AUTH_INVALID_CREDENTIALS');
         }
 
         const isValidPassword = await bcrypt.compare(password, user.passwordHash);
         if (!isValidPassword) {
-            return res.status(401).json({
-                success: false,
-                message: 'Invalid email or password'
-            });
+            return sendError(res, 401, 'Invalid email or password', 'AUTH_INVALID_CREDENTIALS');
         }
 
         user.lastLogin = new Date();
@@ -348,11 +381,7 @@ app.post('/api/auth/login', async (req, res) => {
             }
         });
     } catch (error) {
-        res.status(500).json({
-            success: false,
-            message: 'Error logging in',
-            error: error.message
-        });
+        return sendError(res, 500, 'Error logging in', 'LOGIN_FAILED', error.message);
     }
 });
 
@@ -360,10 +389,7 @@ app.get('/api/auth/me', authenticateToken, async (req, res) => {
     try {
         const user = await User.findById(req.user.sub);
         if (!user) {
-            return res.status(404).json({
-                success: false,
-                message: 'User not found'
-            });
+            return sendError(res, 404, 'User not found', 'USER_NOT_FOUND');
         }
 
         res.json({
@@ -371,11 +397,7 @@ app.get('/api/auth/me', authenticateToken, async (req, res) => {
             data: sanitizeUser(user)
         });
     } catch (error) {
-        res.status(500).json({
-            success: false,
-            message: 'Error fetching user profile',
-            error: error.message
-        });
+        return sendError(res, 500, 'Error fetching user profile', 'PROFILE_FETCH_FAILED', error.message);
     }
 });
 
@@ -384,10 +406,40 @@ app.get('/api/auth/me', authenticateToken, async (req, res) => {
 // Get all donors
 app.get('/api/donors', async (req, res) => {
     try {
-        const donors = await Donor.find().sort({ createdAt: -1 });
+        const { page, limit, skip } = getPagination(req);
+        const query = {};
+
+        if (req.query.bloodType && BLOOD_TYPES.includes(req.query.bloodType)) {
+            query.bloodType = req.query.bloodType;
+        }
+
+        if (req.query.status && ['active', 'inactive', 'eligible', 'ineligible'].includes(req.query.status)) {
+            query.status = req.query.status;
+        }
+
+        if (req.query.q) {
+            const safeQ = escapeRegex(req.query.q.trim());
+            query.$or = [
+                { name: { $regex: safeQ, $options: 'i' } },
+                { phone: { $regex: safeQ, $options: 'i' } },
+                { email: { $regex: safeQ, $options: 'i' } }
+            ];
+        }
+
+        const [donors, total] = await Promise.all([
+            Donor.find(query).sort({ createdAt: -1 }).skip(skip).limit(limit),
+            Donor.countDocuments(query)
+        ]);
+
         res.json({
             success: true,
             count: donors.length,
+            total,
+            pagination: {
+                page,
+                limit,
+                totalPages: Math.max(1, Math.ceil(total / limit))
+            },
             data: donors
         });
     } catch (error) {
@@ -425,6 +477,11 @@ app.get('/api/donors/:id', async (req, res) => {
 // Register new donor
 app.post('/api/donors', authenticateToken, authorizeRoles('admin', 'staff'), async (req, res) => {
     try {
+        const validationErrors = validateDonorInput(req.body);
+        if (validationErrors.length > 0) {
+            return sendError(res, 400, 'Invalid donor input', 'VALIDATION_ERROR', validationErrors);
+        }
+
         const donor = new Donor(req.body);
         await donor.save();
 
@@ -437,17 +494,18 @@ app.post('/api/donors', authenticateToken, authorizeRoles('admin', 'staff'), asy
             data: donor
         });
     } catch (error) {
-        res.status(400).json({
-            success: false,
-            message: 'Error registering donor',
-            error: error.message
-        });
+        return sendError(res, 400, 'Error registering donor', 'DONOR_CREATE_FAILED', error.message);
     }
 });
 
 // Update donor
 app.put('/api/donors/:id', authenticateToken, authorizeRoles('admin', 'staff'), async (req, res) => {
     try {
+        const validationErrors = validateDonorInput(req.body);
+        if (validationErrors.length > 0) {
+            return sendError(res, 400, 'Invalid donor input', 'VALIDATION_ERROR', validationErrors);
+        }
+
         const donor = await Donor.findByIdAndUpdate(
             req.params.id,
             req.body,
@@ -455,10 +513,7 @@ app.put('/api/donors/:id', authenticateToken, authorizeRoles('admin', 'staff'), 
         );
         
         if (!donor) {
-            return res.status(404).json({
-                success: false,
-                message: 'Donor not found'
-            });
+            return sendError(res, 404, 'Donor not found', 'DONOR_NOT_FOUND');
         }
 
         res.json({
@@ -467,11 +522,7 @@ app.put('/api/donors/:id', authenticateToken, authorizeRoles('admin', 'staff'), 
             data: donor
         });
     } catch (error) {
-        res.status(400).json({
-            success: false,
-            message: 'Error updating donor',
-            error: error.message
-        });
+        return sendError(res, 400, 'Error updating donor', 'DONOR_UPDATE_FAILED', error.message);
     }
 });
 
@@ -481,10 +532,7 @@ app.delete('/api/donors/:id', authenticateToken, authorizeRoles('admin'), async 
         const donor = await Donor.findByIdAndDelete(req.params.id);
         
         if (!donor) {
-            return res.status(404).json({
-                success: false,
-                message: 'Donor not found'
-            });
+            return sendError(res, 404, 'Donor not found', 'DONOR_NOT_FOUND');
         }
 
         res.json({
@@ -492,11 +540,7 @@ app.delete('/api/donors/:id', authenticateToken, authorizeRoles('admin'), async 
             message: 'Donor deleted successfully'
         });
     } catch (error) {
-        res.status(500).json({
-            success: false,
-            message: 'Error deleting donor',
-            error: error.message
-        });
+        return sendError(res, 500, 'Error deleting donor', 'DONOR_DELETE_FAILED', error.message);
     }
 });
 
@@ -527,10 +571,44 @@ app.get('/api/donors/search/:bloodType', async (req, res) => {
 // Get all requests
 app.get('/api/requests', async (req, res) => {
     try {
-        const requests = await Request.find().sort({ createdAt: -1 });
+        const { page, limit, skip } = getPagination(req);
+        const query = {};
+
+        if (req.query.bloodType && BLOOD_TYPES.includes(req.query.bloodType)) {
+            query.bloodType = req.query.bloodType;
+        }
+
+        if (req.query.status && ['pending', 'approved', 'fulfilled', 'rejected'].includes(req.query.status)) {
+            query.status = req.query.status;
+        }
+
+        if (req.query.urgency && ['Critical', 'Urgent', 'Normal'].includes(req.query.urgency)) {
+            query.urgency = req.query.urgency;
+        }
+
+        if (req.query.q) {
+            const safeQ = escapeRegex(req.query.q.trim());
+            query.$or = [
+                { patientName: { $regex: safeQ, $options: 'i' } },
+                { hospital: { $regex: safeQ, $options: 'i' } },
+                { contactPerson: { $regex: safeQ, $options: 'i' } }
+            ];
+        }
+
+        const [requests, total] = await Promise.all([
+            Request.find(query).sort({ createdAt: -1 }).skip(skip).limit(limit),
+            Request.countDocuments(query)
+        ]);
+
         res.json({
             success: true,
             count: requests.length,
+            total,
+            pagination: {
+                page,
+                limit,
+                totalPages: Math.max(1, Math.ceil(total / limit))
+            },
             data: requests
         });
     } catch (error) {
@@ -545,15 +623,22 @@ app.get('/api/requests', async (req, res) => {
 // Create blood request
 app.post('/api/requests', authenticateToken, authorizeRoles('admin', 'staff'), async (req, res) => {
     try {
+        const validationErrors = validateRequestInput(req.body);
+        if (validationErrors.length > 0) {
+            return sendError(res, 400, 'Invalid request input', 'VALIDATION_ERROR', validationErrors);
+        }
+
         // Check inventory availability
         const inventory = await Inventory.findOne({ bloodType: req.body.bloodType });
         
         if (!inventory || inventory.units < req.body.units) {
-            return res.status(400).json({
-                success: false,
-                message: 'Insufficient blood units available',
-                available: inventory ? inventory.units : 0
-            });
+            return sendError(
+                res,
+                400,
+                'Insufficient blood units available',
+                'INSUFFICIENT_INVENTORY',
+                { available: inventory ? inventory.units : 0 }
+            );
         }
 
         const request = new Request(req.body);
@@ -573,11 +658,7 @@ app.post('/api/requests', authenticateToken, authorizeRoles('admin', 'staff'), a
             data: request
         });
     } catch (error) {
-        res.status(400).json({
-            success: false,
-            message: 'Error creating request',
-            error: error.message
-        });
+        return sendError(res, 400, 'Error creating request', 'REQUEST_CREATE_FAILED', error.message);
     }
 });
 
@@ -591,10 +672,7 @@ app.put('/api/requests/:id', authenticateToken, authorizeRoles('admin', 'staff')
         );
         
         if (!request) {
-            return res.status(404).json({
-                success: false,
-                message: 'Request not found'
-            });
+            return sendError(res, 404, 'Request not found', 'REQUEST_NOT_FOUND');
         }
 
         res.json({
@@ -603,11 +681,7 @@ app.put('/api/requests/:id', authenticateToken, authorizeRoles('admin', 'staff')
             data: request
         });
     } catch (error) {
-        res.status(400).json({
-            success: false,
-            message: 'Error updating request',
-            error: error.message
-        });
+        return sendError(res, 400, 'Error updating request', 'REQUEST_UPDATE_FAILED', error.message);
     }
 });
 
@@ -664,6 +738,11 @@ app.get('/api/inventory/:bloodType', async (req, res) => {
 // Update inventory manually
 app.put('/api/inventory/:bloodType', authenticateToken, authorizeRoles('admin'), async (req, res) => {
     try {
+        const validationErrors = validateInventoryUpdateInput(req.body, req.params.bloodType);
+        if (validationErrors.length > 0) {
+            return sendError(res, 400, 'Invalid inventory input', 'VALIDATION_ERROR', validationErrors);
+        }
+
         const inventory = await Inventory.findOneAndUpdate(
             { bloodType: req.params.bloodType },
             { 
@@ -679,11 +758,7 @@ app.put('/api/inventory/:bloodType', authenticateToken, authorizeRoles('admin'),
             data: inventory
         });
     } catch (error) {
-        res.status(400).json({
-            success: false,
-            message: 'Error updating inventory',
-            error: error.message
-        });
+        return sendError(res, 400, 'Error updating inventory', 'INVENTORY_UPDATE_FAILED', error.message);
     }
 });
 
@@ -756,20 +831,13 @@ async function updateInventory(bloodType, change) {
 
 // 404 Handler
 app.use((req, res) => {
-    res.status(404).json({
-        success: false,
-        message: 'Route not found'
-    });
+    return sendError(res, 404, 'Route not found', 'ROUTE_NOT_FOUND');
 });
 
 // Global Error Handler
 app.use((err, req, res, next) => {
     console.error(err.stack);
-    res.status(500).json({
-        success: false,
-        message: 'Internal server error',
-        error: err.message
-    });
+    return sendError(res, 500, 'Internal server error', 'INTERNAL_SERVER_ERROR', err.message);
 });
 
 // ==================== START SERVER ====================

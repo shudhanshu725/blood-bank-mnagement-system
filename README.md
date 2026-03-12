@@ -76,19 +76,24 @@ python -m http.server 8000
 
 Base URL: `http://localhost:5000/api`
 
+- `POST /auth/register`
+- `POST /auth/login`
+- `GET /auth/me` (requires `Authorization: Bearer <token>`)
 - `GET /donors`
+- Query params for `/donors`: `page`, `limit`, `q`, `bloodType`, `status`
 - `GET /donors/:id`
-- `POST /donors`
-- `PUT /donors/:id`
-- `DELETE /donors/:id`
+- `POST /donors` (requires auth: `admin` or `staff`)
+- `PUT /donors/:id` (requires auth: `admin` or `staff`)
+- `DELETE /donors/:id` (requires auth: `admin` only)
 - `GET /donors/search/:bloodType`
 - `GET /requests`
-- `POST /requests`
-- `PUT /requests/:id`
+- Query params for `/requests`: `page`, `limit`, `q`, `bloodType`, `status`, `urgency`
+- `POST /requests` (requires auth: `admin` or `staff`)
+- `PUT /requests/:id` (requires auth: `admin` or `staff`)
 - `GET /inventory`
 - `GET /inventory/:bloodType`
-- `PUT /inventory/:bloodType`
-- `GET /stats`
+- `PUT /inventory/:bloodType` (requires auth: `admin` only)
+- `GET /stats` (requires auth: `admin` or `staff`)
 
 ## Full Stack Implementation Plan (7 Days)
 

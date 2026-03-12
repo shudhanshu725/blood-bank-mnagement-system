@@ -74,6 +74,81 @@
         .nav {
             display: flex;
             gap: 2rem;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+
+        .user-badge {
+            font-size: 0.85rem;
+            color: var(--secondary);
+            background: rgba(44, 62, 80, 0.1);
+            padding: 0.5rem 0.8rem;
+            border-radius: 999px;
+            font-weight: 600;
+        }
+
+        .auth-modal {
+            position: fixed;
+            inset: 0;
+            background: rgba(44, 62, 80, 0.55);
+            display: none;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+            padding: 1rem;
+        }
+
+        .auth-modal.show {
+            display: flex;
+        }
+
+        .auth-panel {
+            width: min(640px, 95vw);
+            max-height: 90vh;
+            overflow-y: auto;
+            background: var(--white);
+            border-radius: 12px;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.25);
+            padding: 1.5rem;
+        }
+
+        .auth-tabs {
+            display: flex;
+            gap: 0.5rem;
+            margin-bottom: 1rem;
+        }
+
+        .auth-tab {
+            border: 1px solid var(--light);
+            background: var(--white);
+            color: var(--secondary);
+            padding: 0.55rem 0.9rem;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: 600;
+        }
+
+        .auth-tab.active {
+            background: var(--primary);
+            color: var(--white);
+            border-color: var(--primary);
+        }
+
+        .auth-view {
+            display: none;
+        }
+
+        .auth-view.active {
+            display: block;
+        }
+
+        .auth-close {
+            float: right;
+            border: none;
+            background: transparent;
+            font-size: 1.3rem;
+            cursor: pointer;
+            color: var(--secondary);
         }
 
         .nav-btn {
@@ -308,6 +383,27 @@
             color: #7f8c8d;
         }
 
+        .donor-item-actions {
+            display: flex;
+            gap: 0.5rem;
+            flex-wrap: wrap;
+            margin-top: 0.7rem;
+        }
+
+        .donor-item-actions .btn {
+            width: auto;
+            margin-top: 0;
+            padding: 0.45rem 0.8rem;
+            font-size: 0.85rem;
+        }
+
+        .donor-item-actions select {
+            padding: 0.45rem;
+            border: 1px solid var(--light);
+            border-radius: 5px;
+            font-size: 0.85rem;
+        }
+
         .blood-type-badge {
             display: inline-block;
             padding: 0.3rem 0.8rem;
@@ -437,9 +533,63 @@
                 <button class="nav-btn" id="navRequestBtn" type="button">Request Blood</button>
                 <button class="nav-btn" id="navInventoryBtn" type="button">Inventory</button>
                 <button class="nav-btn" id="exportBtn" type="button">Export Data</button>
+                <button class="nav-btn" id="showAuthBtn" type="button">Login/Register</button>
+                <button class="nav-btn" id="logoutBtn" type="button">Logout</button>
+                <span class="user-badge" id="authUserBadge">Guest</span>
             </nav>
         </div>
     </header>
+
+    <div class="auth-modal" id="authModal">
+        <div class="auth-panel">
+            <button class="auth-close" id="authCloseBtn" type="button" aria-label="Close auth popup">x</button>
+            <h2>Authentication</h2>
+            <div id="authAlert" class="alert"></div>
+            <div class="auth-tabs">
+                <button class="auth-tab active" id="authTabLogin" type="button">Login</button>
+                <button class="auth-tab" id="authTabRegister" type="button">Register</button>
+            </div>
+
+            <div class="auth-view active" id="authViewLogin">
+                <form id="loginForm">
+                    <div class="form-group">
+                        <label for="loginEmail">Login Email</label>
+                        <input type="email" id="loginEmail" placeholder="your@email.com">
+                    </div>
+                    <div class="form-group">
+                        <label for="loginPassword">Login Password</label>
+                        <input type="password" id="loginPassword" placeholder="Enter password">
+                    </div>
+                    <button type="submit" class="btn btn-primary" id="loginBtn">Login</button>
+                </form>
+            </div>
+
+            <div class="auth-view" id="authViewRegister">
+                <form id="registerForm">
+                    <div class="form-group">
+                        <label for="registerName">Register Name</label>
+                        <input type="text" id="registerName" placeholder="Your full name">
+                    </div>
+                    <div class="form-group">
+                        <label for="registerEmail">Register Email</label>
+                        <input type="email" id="registerEmail" placeholder="your@email.com">
+                    </div>
+                    <div class="form-group">
+                        <label for="registerPassword">Register Password</label>
+                        <input type="password" id="registerPassword" placeholder="Minimum 6 characters">
+                    </div>
+                    <div class="form-group">
+                        <label for="registerRole">Register Role</label>
+                        <select id="registerRole">
+                            <option value="staff">staff</option>
+                            <option value="admin">admin</option>
+                        </select>
+                    </div>
+                    <button type="submit" class="btn btn-success" id="registerBtn">Register</button>
+                </form>
+            </div>
+        </div>
+    </div>
 
     <!-- Main Container -->
     <div class="container">
@@ -579,6 +729,15 @@
                     <span class="search-icon">🔍</span>
                     <input type="text" id="searchInventory" placeholder="Search blood type...">
                 </div>
+                <div class="form-group">
+                    <label for="inventoryStatusFilter">Stock Filter</label>
+                    <select id="inventoryStatusFilter">
+                        <option value="all">All</option>
+                        <option value="low">Low Stock (&lt; 10)</option>
+                        <option value="medium">Medium Stock (10 - 24)</option>
+                        <option value="high">Good Stock (25+)</option>
+                    </select>
+                </div>
                 <table class="inventory-table">
                     <thead>
                         <tr>
@@ -593,37 +752,146 @@
                 </table>
             </div>
 
-            <!-- Recent Donors -->
+            <!-- Donor Management -->
             <div class="card">
-                <h2>👥 Recent Donors</h2>
+                <h2>Donor Management</h2>
+                <div id="manageDonorAlert" class="alert"></div>
                 <div class="search-box">
                     <span class="search-icon">🔍</span>
                     <input type="text" id="searchDonors" placeholder="Search donors...">
                 </div>
-                <div class="spinner" id="donorSpinner"></div>
+                <div class="form-group">
+                    <label for="filterDonorBloodType">Donor Blood Type</label>
+                    <select id="filterDonorBloodType">
+                        <option value="">All Blood Types</option>
+                        <option value="A+">A+</option>
+                        <option value="A-">A-</option>
+                        <option value="B+">B+</option>
+                        <option value="B-">B-</option>
+                        <option value="AB+">AB+</option>
+                        <option value="AB-">AB-</option>
+                        <option value="O+">O+</option>
+                        <option value="O-">O-</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="filterDonorStatus">Donor Status</label>
+                    <select id="filterDonorStatus">
+                        <option value="">All Status</option>
+                        <option value="active">active</option>
+                        <option value="inactive">inactive</option>
+                        <option value="eligible">eligible</option>
+                        <option value="ineligible">ineligible</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <button type="button" class="btn btn-primary" id="clearDonorFiltersBtn">Clear Donor Filters</button>
+                </div>
                 <ul class="donors-list" id="donorsList">
                     <!-- Will be populated by JavaScript -->
                 </ul>
+                <div class="form-group">
+                    <button type="button" class="btn btn-primary" id="donorsPrevBtn">Previous Donors</button>
+                    <button type="button" class="btn btn-primary" id="donorsNextBtn">Next Donors</button>
+                    <p id="donorsPageInfo">Page 1</p>
+                </div>
+            </div>
+
+            <!-- Request Management -->
+            <div class="card">
+                <h2>Request Management</h2>
+                <div id="manageRequestAlert" class="alert"></div>
+                <div class="search-box">
+                    <span class="search-icon">🔍</span>
+                    <input type="text" id="searchRequests" placeholder="Search requests...">
+                </div>
+                <div class="form-group">
+                    <label for="filterRequestBloodType">Request Blood Type</label>
+                    <select id="filterRequestBloodType">
+                        <option value="">All Blood Types</option>
+                        <option value="A+">A+</option>
+                        <option value="A-">A-</option>
+                        <option value="B+">B+</option>
+                        <option value="B-">B-</option>
+                        <option value="AB+">AB+</option>
+                        <option value="AB-">AB-</option>
+                        <option value="O+">O+</option>
+                        <option value="O-">O-</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="filterRequestStatus">Request Status</label>
+                    <select id="filterRequestStatus">
+                        <option value="">All Status</option>
+                        <option value="pending">pending</option>
+                        <option value="approved">approved</option>
+                        <option value="fulfilled">fulfilled</option>
+                        <option value="rejected">rejected</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="filterRequestUrgency">Request Urgency</label>
+                    <select id="filterRequestUrgency">
+                        <option value="">All Urgency</option>
+                        <option value="Critical">Critical</option>
+                        <option value="Urgent">Urgent</option>
+                        <option value="Normal">Normal</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <button type="button" class="btn btn-success" id="clearRequestFiltersBtn">Clear Request Filters</button>
+                </div>
+                <ul class="donors-list" id="requestsList">
+                    <!-- Will be populated by JavaScript -->
+                </ul>
+                <div class="form-group">
+                    <button type="button" class="btn btn-success" id="requestsPrevBtn">Previous Requests</button>
+                    <button type="button" class="btn btn-success" id="requestsNextBtn">Next Requests</button>
+                    <p id="requestsPageInfo">Page 1</p>
+                </div>
             </div>
         </div>
     </div>
 
         <script>
         const API_BASE_URL = 'http://localhost:5000/api';
+        const AUTH_TOKEN_KEY = 'bloodbank_auth_token';
         const DEFAULT_INVENTORY = {
             'A+': 45, 'A-': 12, 'B+': 38, 'B-': 8,
             'AB+': 15, 'AB-': 5, 'O+': 52, 'O-': 18
         };
 
         let useBackend = false;
+        let authToken = localStorage.getItem(AUTH_TOKEN_KEY) || '';
+        let currentUser = null;
         let donors = [];
         let requests = [];
         let inventory = { ...DEFAULT_INVENTORY };
 
+        let donorSearchTerm = '';
+        let requestSearchTerm = '';
+        let inventorySearchTerm = '';
+        let inventoryStatusFilter = 'all';
+        let donorBloodFilter = '';
+        let donorStatusFilter = '';
+        let requestBloodFilter = '';
+        let requestStatusFilter = '';
+        let requestUrgencyFilter = '';
+        let donorPage = 1;
+        let requestPage = 1;
+        const donorPageSize = 5;
+        const requestPageSize = 5;
+        let editingDonorId = null;
+        let donorsPaginationMeta = { page: 1, limit: donorPageSize, totalPages: 1, total: 0 };
+        let requestsPaginationMeta = { page: 1, limit: requestPageSize, totalPages: 1, total: 0 };
+        let dashboardStats = null;
+
         document.addEventListener('DOMContentLoaded', async function() {
             setupButtonActions();
-            setupSearchFunctionality();
+            setupAuthHandlers();
+            setupSearchFunctionality();
             setupFormHandlers();
+            setupManagementActions();
             await initializeApp();
         });
 
@@ -632,11 +900,197 @@
             document.getElementById('navRequestBtn').addEventListener('click', () => showSection('request'));
             document.getElementById('navInventoryBtn').addEventListener('click', () => showSection('inventory'));
             document.getElementById('exportBtn').addEventListener('click', exportData);
+            document.getElementById('showAuthBtn').addEventListener('click', () => openAuthModal('login'));
+            document.getElementById('logoutBtn').addEventListener('click', logoutUser);
+            document.getElementById('authCloseBtn').addEventListener('click', closeAuthModal);
+            document.getElementById('authModal').addEventListener('click', (e) => {
+                if (e.target.id === 'authModal') closeAuthModal();
+            });
+        }
+
+        function setupAuthHandlers() {
+            document.getElementById('authTabLogin').addEventListener('click', () => switchAuthView('login'));
+            document.getElementById('authTabRegister').addEventListener('click', () => switchAuthView('register'));
+
+            document.getElementById('loginForm').addEventListener('submit', async function(e) {
+                e.preventDefault();
+                const email = document.getElementById('loginEmail').value.trim();
+                const password = document.getElementById('loginPassword').value;
+                if (!email || !password) {
+                    showAlert('authAlert', 'Email and password are required.', 'danger');
+                    return;
+                }
+
+                try {
+                    const response = await fetch(`${API_BASE_URL}/auth/login`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ email, password })
+                    });
+                    const data = await response.json();
+                    if (!response.ok) throw new Error(data.message || 'Login failed');
+                    authToken = data.data?.token || '';
+                    localStorage.setItem(AUTH_TOKEN_KEY, authToken);
+                    await hydrateCurrentUser();
+                    showAlert('authAlert', 'Login successful.', 'success');
+                    await loadData();
+                    renderAll();
+                    closeAuthModal();
+                } catch (error) {
+                    showAlert('authAlert', error.message, 'danger');
+                }
+            });
+
+            document.getElementById('registerForm').addEventListener('submit', async function(e) {
+                e.preventDefault();
+                const payload = {
+                    name: document.getElementById('registerName').value.trim(),
+                    email: document.getElementById('registerEmail').value.trim(),
+                    password: document.getElementById('registerPassword').value,
+                    role: document.getElementById('registerRole').value
+                };
+                if (!payload.name || !payload.email || !payload.password) {
+                    showAlert('authAlert', 'Name, email and password are required.', 'danger');
+                    return;
+                }
+
+                try {
+                    const response = await fetch(`${API_BASE_URL}/auth/register`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(payload)
+                    });
+                    const data = await response.json();
+                    if (!response.ok) throw new Error(data.message || 'Register failed');
+                    showAlert('authAlert', 'Registration successful. Please login.', 'success');
+                    document.getElementById('loginEmail').value = payload.email;
+                    document.getElementById('registerForm').reset();
+                    switchAuthView('login');
+                } catch (error) {
+                    showAlert('authAlert', error.message, 'danger');
+                }
+            });
+        }
+
+        function openAuthModal(view = 'login') {
+            const modal = document.getElementById('authModal');
+            if (!modal) return;
+            modal.classList.add('show');
+            switchAuthView(view);
+            if (view === 'login') {
+                document.getElementById('loginEmail').focus();
+            } else {
+                document.getElementById('registerName').focus();
+            }
+        }
+
+        function closeAuthModal() {
+            const modal = document.getElementById('authModal');
+            if (!modal) return;
+            modal.classList.remove('show');
+        }
+
+        function switchAuthView(view) {
+            const loginTab = document.getElementById('authTabLogin');
+            const registerTab = document.getElementById('authTabRegister');
+            const loginView = document.getElementById('authViewLogin');
+            const registerView = document.getElementById('authViewRegister');
+
+            const isLogin = view === 'login';
+            loginTab.classList.toggle('active', isLogin);
+            registerTab.classList.toggle('active', !isLogin);
+            loginView.classList.toggle('active', isLogin);
+            registerView.classList.toggle('active', !isLogin);
+        }
+
+        function setupManagementActions() {
+            document.getElementById('donorsPrevBtn').addEventListener('click', () => {
+                donorPage = Math.max(1, donorPage - 1);
+                if (useBackend) {
+                    fetchDonorsPage().then(displayDonors);
+                } else {
+                    displayDonors();
+                }
+            });
+            document.getElementById('donorsNextBtn').addEventListener('click', () => {
+                const totalPages = useBackend
+                    ? Math.max(1, donorsPaginationMeta.totalPages || 1)
+                    : Math.max(1, Math.ceil(getFilteredDonors().length / donorPageSize));
+                donorPage = Math.min(totalPages, donorPage + 1);
+                if (useBackend) {
+                    fetchDonorsPage().then(displayDonors);
+                } else {
+                    displayDonors();
+                }
+            });
+
+            document.getElementById('requestsPrevBtn').addEventListener('click', () => {
+                requestPage = Math.max(1, requestPage - 1);
+                if (useBackend) {
+                    fetchRequestsPage().then(displayRequests);
+                } else {
+                    displayRequests();
+                }
+            });
+            document.getElementById('requestsNextBtn').addEventListener('click', () => {
+                const totalPages = useBackend
+                    ? Math.max(1, requestsPaginationMeta.totalPages || 1)
+                    : Math.max(1, Math.ceil(getFilteredRequests().length / requestPageSize));
+                requestPage = Math.min(totalPages, requestPage + 1);
+                if (useBackend) {
+                    fetchRequestsPage().then(displayRequests);
+                } else {
+                    displayRequests();
+                }
+            });
+
+            document.getElementById('donorsList').addEventListener('click', async (e) => {
+                const action = e.target.dataset.action;
+                const id = e.target.dataset.id;
+                if (!action || !id) return;
+
+                if (action === 'edit-donor') {
+                    const donor = donors.find(item => getEntityId(item) === id);
+                    if (!donor) return;
+                    editingDonorId = id;
+                    document.getElementById('donorName').value = donor.name || '';
+                    document.getElementById('donorAge').value = donor.age || '';
+                    document.getElementById('donorBloodType').value = donor.bloodType || '';
+                    document.getElementById('donorPhone').value = donor.phone || '';
+                    document.getElementById('donorEmail').value = donor.email || '';
+                    document.getElementById('donorAddress').value = donor.address || '';
+                    document.getElementById('donorSubmitBtn').textContent = 'Update Donor';
+                    showAlert('manageDonorAlert', 'Editing donor. Update and submit the form.', 'success');
+                    showSection('donor');
+                }
+
+                if (action === 'delete-donor') {
+                    await deleteDonor(id);
+                }
+            });
+
+            document.getElementById('requestsList').addEventListener('click', async (e) => {
+                if (e.target.dataset.action !== 'save-request-status') return;
+                const id = e.target.dataset.id;
+                const selectId = id.replace(/[^a-zA-Z0-9_-]/g, '_');
+                const select = document.getElementById(`request-status-${selectId}`);
+                if (!select) return;
+                await updateRequestStatus(id, select.value);
+            });
         }
 
         async function initializeApp() {
             useBackend = await isBackendAvailable();
+            if (useBackend) {
+                const hasSession = await ensureBackendSession();
+                if (!hasSession) {
+                    authToken = '';
+                    localStorage.removeItem(AUTH_TOKEN_KEY);
+                    currentUser = null;
+                }
+            }
             updateModeText();
+            updateAuthBadge();
             await loadData();
             renderAll();
         }
@@ -656,27 +1110,88 @@
         function updateModeText() {
             const modeText = document.getElementById('systemMode');
             if (!modeText) return;
-            modeText.textContent = useBackend
-                ? 'Connected to backend database'
-                : 'Offline mode (LocalStorage)';
+            if (!useBackend) {
+                modeText.textContent = 'Offline mode (LocalStorage)';
+                return;
+            }
+            modeText.textContent = currentUser
+                ? `Connected to backend (${currentUser.role})`
+                : 'Connected to backend (guest)';
+        }
+
+        async function ensureBackendSession() {
+            if (!authToken) return false;
+            return hydrateCurrentUser();
+        }
+
+        async function hydrateCurrentUser() {
+            if (!authToken) {
+                currentUser = null;
+                updateAuthBadge();
+                updateModeText();
+                return false;
+            }
+            try {
+                const me = await authFetch(`${API_BASE_URL}/auth/me`);
+                if (!me.ok) {
+                    currentUser = null;
+                    updateAuthBadge();
+                    updateModeText();
+                    return false;
+                }
+                const data = await me.json();
+                currentUser = data.data || null;
+                updateAuthBadge();
+                updateModeText();
+                return Boolean(currentUser);
+            } catch (error) {
+                currentUser = null;
+                updateAuthBadge();
+                updateModeText();
+                return false;
+            }
+        }
+
+        function updateAuthBadge() {
+            const badge = document.getElementById('authUserBadge');
+            const showAuthBtn = document.getElementById('showAuthBtn');
+            const logoutBtn = document.getElementById('logoutBtn');
+            if (!badge) return;
+            if (!currentUser) {
+                badge.textContent = 'Guest';
+                if (showAuthBtn) showAuthBtn.textContent = 'Login/Register';
+                if (logoutBtn) logoutBtn.style.display = 'none';
+                return;
+            }
+            badge.textContent = `${currentUser.name} (${currentUser.role})`;
+            if (showAuthBtn) showAuthBtn.textContent = 'Account';
+            if (logoutBtn) logoutBtn.style.display = '';
+        }
+
+        async function logoutUser() {
+            authToken = '';
+            currentUser = null;
+            localStorage.removeItem(AUTH_TOKEN_KEY);
+            updateAuthBadge();
+            updateModeText();
+            showAlert('authAlert', 'Logged out successfully.', 'success');
+            await loadData();
+            renderAll();
+        }
+
+        function authFetch(url, options = {}) {
+            const headers = { ...(options.headers || {}) };
+            if (authToken) headers.Authorization = `Bearer ${authToken}`;
+            return fetch(url, { ...options, headers });
         }
 
         async function loadData() {
             if (useBackend) {
                 try {
-                    const [donorRes, requestRes, inventoryRes] = await Promise.all([
-                        fetch(`${API_BASE_URL}/donors`),
-                        fetch(`${API_BASE_URL}/requests`),
-                        fetch(`${API_BASE_URL}/inventory`)
-                    ]);
-
-                    const donorJson = await donorRes.json();
-                    const requestJson = await requestRes.json();
+                    const inventoryRes = await authFetch(`${API_BASE_URL}/inventory`);
                     const inventoryJson = await inventoryRes.json();
-
-                    donors = Array.isArray(donorJson.data) ? donorJson.data : [];
-                    requests = Array.isArray(requestJson.data) ? requestJson.data : [];
                     inventory = inventoryArrayToObject(inventoryJson.data);
+                    await Promise.all([fetchDonorsPage(), fetchRequestsPage(), fetchDashboardStats()]);
                     return;
                 } catch (error) {
                     useBackend = false;
@@ -687,6 +1202,74 @@
             donors = safeParse(localStorage.getItem('donors'), []);
             requests = safeParse(localStorage.getItem('requests'), []);
             inventory = safeParse(localStorage.getItem('inventory'), { ...DEFAULT_INVENTORY });
+            donorsPaginationMeta = { page: 1, limit: donorPageSize, totalPages: 1, total: donors.length };
+            requestsPaginationMeta = { page: 1, limit: requestPageSize, totalPages: 1, total: requests.length };
+            dashboardStats = null;
+        }
+
+        function buildQueryParams(queryMap) {
+            const params = new URLSearchParams();
+            Object.entries(queryMap).forEach(([key, value]) => {
+                if (value === null || value === undefined) return;
+                const raw = String(value).trim();
+                if (!raw) return;
+                params.set(key, raw);
+            });
+            return params.toString();
+        }
+
+        async function fetchDonorsPage() {
+            if (!useBackend) return;
+            const query = buildQueryParams({
+                page: donorPage,
+                limit: donorPageSize,
+                q: donorSearchTerm,
+                bloodType: donorBloodFilter,
+                status: donorStatusFilter
+            });
+            const response = await authFetch(`${API_BASE_URL}/donors?${query}`);
+            const data = await response.json();
+            if (!response.ok) throw new Error(data.message || data.error || 'Failed to load donors');
+            donors = Array.isArray(data.data) ? data.data : [];
+            donorsPaginationMeta = {
+                page: data.pagination?.page || donorPage,
+                limit: data.pagination?.limit || donorPageSize,
+                totalPages: data.pagination?.totalPages || 1,
+                total: Number(data.total || 0)
+            };
+            donorPage = donorsPaginationMeta.page;
+        }
+
+        async function fetchRequestsPage() {
+            if (!useBackend) return;
+            const query = buildQueryParams({
+                page: requestPage,
+                limit: requestPageSize,
+                q: requestSearchTerm,
+                bloodType: requestBloodFilter,
+                status: requestStatusFilter,
+                urgency: requestUrgencyFilter
+            });
+            const response = await authFetch(`${API_BASE_URL}/requests?${query}`);
+            const data = await response.json();
+            if (!response.ok) throw new Error(data.message || data.error || 'Failed to load requests');
+            requests = Array.isArray(data.data) ? data.data : [];
+            requestsPaginationMeta = {
+                page: data.pagination?.page || requestPage,
+                limit: data.pagination?.limit || requestPageSize,
+                totalPages: data.pagination?.totalPages || 1,
+                total: Number(data.total || 0)
+            };
+            requestPage = requestsPaginationMeta.page;
+        }
+
+        async function fetchDashboardStats() {
+            if (!useBackend) return;
+            const response = await authFetch(`${API_BASE_URL}/stats`);
+            const data = await response.json();
+            if (response.ok && data?.data) {
+                dashboardStats = data.data;
+            }
         }
 
         function inventoryArrayToObject(inventoryArray) {
@@ -694,9 +1277,7 @@
             if (!Array.isArray(inventoryArray)) return asObject;
 
             inventoryArray.forEach(item => {
-                if (item && item.bloodType) {
-                    asObject[item.bloodType] = Number(item.units) || 0;
-                }
+                if (item && item.bloodType) asObject[item.bloodType] = Number(item.units) || 0;
             });
             return asObject;
         }
@@ -710,7 +1291,8 @@
         function renderAll() {
             updateStats();
             displayInventory();
-            displayRecentDonors();
+            displayDonors();
+            displayRequests();
         }
 
         function setupFormHandlers() {
@@ -719,7 +1301,7 @@
                 const submitBtn = document.getElementById('donorSubmitBtn');
                 submitBtn.disabled = true;
                 const originalText = submitBtn.textContent;
-                submitBtn.textContent = 'Saving...';
+                submitBtn.textContent = editingDonorId ? 'Updating...' : 'Saving...';
 
                 const donor = {
                     name: document.getElementById('donorName').value.trim(),
@@ -739,8 +1321,17 @@
                 }
 
                 try {
-                    if (useBackend) {
-                        const response = await fetch(`${API_BASE_URL}/donors`, {
+                    if (editingDonorId) {
+                        await updateDonor(editingDonorId, donor);
+                        showAlert('donorAlert', 'Donor updated successfully.', 'success');
+                        showAlert('manageDonorAlert', 'Donor updated successfully.', 'success');
+                        editingDonorId = null;
+                    } else if (useBackend) {
+                        if (!currentUser) {
+                            openAuthModal('login');
+                            throw new Error('Login required to register donor in backend mode');
+                        }
+                        const response = await authFetch(`${API_BASE_URL}/donors`, {
                             method: 'POST',
                             headers: { 'Content-Type': 'application/json' },
                             body: JSON.stringify(donor)
@@ -748,21 +1339,23 @@
                         const data = await response.json();
                         if (!response.ok) throw new Error(data.message || data.error || 'Failed to register donor');
                         await loadData();
+                        showAlert('donorAlert', `Thank you ${donor.name}! Registration successful.`, 'success');
                     } else {
                         donor.id = Date.now();
                         donors.unshift(donor);
                         inventory[donor.bloodType] = (inventory[donor.bloodType] || 0) + 1;
                         persistLocalData();
+                        showAlert('donorAlert', `Thank you ${donor.name}! Registration successful.`, 'success');
                     }
 
-                    showAlert('donorAlert', `Thank you ${donor.name}! Registration successful.`, 'success');
                     this.reset();
+                    submitBtn.textContent = 'Register Donor';
                     renderAll();
                 } catch (error) {
                     showAlert('donorAlert', error.message, 'danger');
                 } finally {
                     submitBtn.disabled = false;
-                    submitBtn.textContent = originalText;
+                    if (!editingDonorId) submitBtn.textContent = 'Register Donor';
                 }
             });
 
@@ -793,7 +1386,11 @@
 
                 try {
                     if (useBackend) {
-                        const response = await fetch(`${API_BASE_URL}/requests`, {
+                        if (!currentUser) {
+                            openAuthModal('login');
+                            throw new Error('Login required to submit request in backend mode');
+                        }
+                        const response = await authFetch(`${API_BASE_URL}/requests`, {
                             method: 'POST',
                             headers: { 'Content-Type': 'application/json' },
                             body: JSON.stringify(request)
@@ -801,29 +1398,16 @@
                         const data = await response.json();
                         if (!response.ok) throw new Error(data.message || data.error || 'Failed to submit request');
                         await loadData();
-                        showAlert(
-                            'requestAlert',
-                            `Request approved! ${request.units} unit(s) of ${request.bloodType} allocated.`,
-                            'success'
-                        );
+                        showAlert('requestAlert', `Request approved! ${request.units} unit(s) of ${request.bloodType} allocated.`, 'success');
                     } else if ((inventory[request.bloodType] || 0) >= request.units) {
                         request.id = Date.now();
+                        request.status = 'approved';
                         inventory[request.bloodType] -= request.units;
-                        requests.push(request);
+                        requests.unshift(request);
                         persistLocalData();
-                        showAlert(
-                            'requestAlert',
-                            `Request approved! ${request.units} unit(s) of ${request.bloodType} allocated.`,
-                            'success'
-                        );
+                        showAlert('requestAlert', `Request approved! ${request.units} unit(s) of ${request.bloodType} allocated.`, 'success');
                     } else {
-                        showAlert(
-                            'requestAlert',
-                            `Insufficient stock. Only ${inventory[request.bloodType] || 0} unit(s) available.`,
-                            'danger'
-                        );
-                        submitBtn.disabled = false;
-                        submitBtn.textContent = originalText;
+                        showAlert('requestAlert', `Insufficient stock. Only ${inventory[request.bloodType] || 0} unit(s) available.`, 'danger');
                         return;
                     }
 
@@ -838,55 +1422,161 @@
             });
         }
 
+        async function updateDonor(id, donorPayload) {
+            if (useBackend) {
+                if (!currentUser) {
+                    openAuthModal('login');
+                    throw new Error('Login required to update donor');
+                }
+                const response = await authFetch(`${API_BASE_URL}/donors/${id}`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(donorPayload)
+                });
+                const data = await response.json();
+                if (!response.ok) throw new Error(data.message || data.error || 'Failed to update donor');
+                await loadData();
+                return;
+            }
+
+            donors = donors.map(item => {
+                if (getEntityId(item) !== id) return item;
+                return { ...item, ...donorPayload };
+            });
+            persistLocalData();
+        }
+
+        async function deleteDonor(id) {
+            try {
+                if (useBackend) {
+                    if (!currentUser) {
+                        openAuthModal('login');
+                        throw new Error('Login required to delete donor');
+                    }
+                    const response = await authFetch(`${API_BASE_URL}/donors/${id}`, { method: 'DELETE' });
+                    const data = await response.json();
+                    if (!response.ok) throw new Error(data.message || data.error || 'Failed to delete donor');
+                    await loadData();
+                } else {
+                    donors = donors.filter(item => getEntityId(item) !== id);
+                    persistLocalData();
+                }
+                showAlert('manageDonorAlert', 'Donor deleted successfully.', 'success');
+                renderAll();
+            } catch (error) {
+                showAlert('manageDonorAlert', error.message, 'danger');
+            }
+        }
+
+        async function updateRequestStatus(id, status) {
+            try {
+                if (useBackend) {
+                    if (!currentUser) {
+                        openAuthModal('login');
+                        throw new Error('Login required to update request status');
+                    }
+                    const response = await authFetch(`${API_BASE_URL}/requests/${id}`, {
+                        method: 'PUT',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ status })
+                    });
+                    const data = await response.json();
+                    if (!response.ok) throw new Error(data.message || data.error || 'Failed to update request status');
+                    await loadData();
+                } else {
+                    requests = requests.map(item => {
+                        if (getEntityId(item) !== id) return item;
+                        return { ...item, status };
+                    });
+                    persistLocalData();
+                }
+                showAlert('manageRequestAlert', `Request status updated to ${status}.`, 'success');
+                renderAll();
+            } catch (error) {
+                showAlert('manageRequestAlert', error.message, 'danger');
+            }
+        }
+
         function updateStats() {
+            if (useBackend && dashboardStats) {
+                document.getElementById('totalDonors').textContent = dashboardStats.totalDonors ?? 0;
+                document.getElementById('totalUnits').textContent = dashboardStats.totalUnits ?? 0;
+                document.getElementById('totalRequests').textContent = dashboardStats.totalRequests ?? 0;
+                document.getElementById('successfulDonations').textContent = dashboardStats.successfulRequests ?? 0;
+                return;
+            }
+
             document.getElementById('totalDonors').textContent = donors.length;
             const totalUnits = Object.values(inventory).reduce((a, b) => a + b, 0);
             document.getElementById('totalUnits').textContent = totalUnits;
             document.getElementById('totalRequests').textContent = requests.length;
-
             const successful = requests.filter(item => item.status === 'approved' || item.status === 'fulfilled').length;
-            document.getElementById('successfulDonations').textContent = useBackend ? successful : donors.length;
+            document.getElementById('successfulDonations').textContent = successful;
+        }
+
+        function getStockMeta(units) {
+            if (units < 10) return { key: 'low', className: 'stock-low', text: 'Low Stock' };
+            if (units < 25) return { key: 'medium', className: 'stock-medium', text: 'Medium Stock' };
+            return { key: 'high', className: 'stock-high', text: 'Good Stock' };
         }
 
         function displayInventory() {
             const tbody = document.getElementById('inventoryTableBody');
             tbody.innerHTML = '';
+            const term = inventorySearchTerm.toUpperCase();
 
             Object.keys(inventory).sort().forEach(bloodType => {
+                if (term && !bloodType.includes(term)) return;
                 const units = Number(inventory[bloodType]) || 0;
+                const stock = getStockMeta(units);
+                if (inventoryStatusFilter !== 'all' && stock.key !== inventoryStatusFilter) return;
+
                 const row = document.createElement('tr');
-
-                let statusClass = 'stock-high';
-                let statusText = 'Good Stock';
-
-                if (units < 10) {
-                    statusClass = 'stock-low';
-                    statusText = 'Low Stock';
-                } else if (units < 25) {
-                    statusClass = 'stock-medium';
-                    statusText = 'Medium Stock';
-                }
-
                 row.innerHTML = `
                     <td><strong>${bloodType}</strong></td>
                     <td>${units} units</td>
-                    <td><span class="stock-badge ${statusClass}">${statusText}</span></td>
+                    <td><span class="stock-badge ${stock.className}">${stock.text}</span></td>
                 `;
                 tbody.appendChild(row);
             });
         }
 
-        function displayRecentDonors() {
+        function getEntityId(item) {
+            return String(item?._id || item?.id || '');
+        }
+
+        function getFilteredDonors() {
+            const term = donorSearchTerm.toLowerCase();
+            return donors.filter(donor => {
+                const combined = `${donor.name || ''} ${donor.bloodType || ''} ${donor.phone || ''}`.toLowerCase();
+                const bloodOk = !donorBloodFilter || donor.bloodType === donorBloodFilter;
+                const statusOk = !donorStatusFilter || (donor.status || 'active') === donorStatusFilter;
+                return combined.includes(term) && bloodOk && statusOk;
+            });
+        }
+
+        function displayDonors() {
             const list = document.getElementById('donorsList');
             list.innerHTML = '';
 
-            const recentDonors = donors.slice(0, 10);
-            if (recentDonors.length === 0) {
-                list.innerHTML = '<li class="donor-item">No donors registered yet</li>';
+            const filtered = useBackend ? donors : getFilteredDonors();
+            const totalPages = useBackend
+                ? Math.max(1, donorsPaginationMeta.totalPages || 1)
+                : Math.max(1, Math.ceil(filtered.length / donorPageSize));
+            if (!useBackend && donorPage > totalPages) donorPage = totalPages;
+            const paged = useBackend
+                ? filtered
+                : filtered.slice((donorPage - 1) * donorPageSize, (donorPage - 1) * donorPageSize + donorPageSize);
+
+            document.getElementById('donorsPageInfo').textContent = `Page ${donorPage} of ${totalPages}`;
+
+            if (paged.length === 0) {
+                list.innerHTML = '<li class="donor-item">No donors found</li>';
                 return;
             }
 
-            recentDonors.forEach(donor => {
+            paged.forEach(donor => {
+                const id = getEntityId(donor);
                 const li = document.createElement('li');
                 li.className = 'donor-item';
                 li.innerHTML = `
@@ -897,6 +1587,69 @@
                     <div class="donor-details">
                         ${donor.age} years | ${donor.phone} | ${formatDisplayDate(donor.createdAt || donor.date)}
                     </div>
+                    <div class="donor-details donor-item-actions">
+                        <button type="button" class="btn btn-primary" data-action="edit-donor" data-id="${id}">Edit</button>
+                        <button type="button" class="btn btn-success" data-action="delete-donor" data-id="${id}">Delete</button>
+                    </div>
+                `;
+                list.appendChild(li);
+            });
+        }
+
+        function getFilteredRequests() {
+            const term = requestSearchTerm.toLowerCase();
+            return requests.filter(request => {
+                const combined = `${request.patientName || ''} ${request.bloodType || ''} ${request.hospital || ''} ${request.status || ''}`.toLowerCase();
+                const bloodOk = !requestBloodFilter || request.bloodType === requestBloodFilter;
+                const statusOk = !requestStatusFilter || (request.status || 'pending') === requestStatusFilter;
+                const urgencyOk = !requestUrgencyFilter || (request.urgency || 'Normal') === requestUrgencyFilter;
+                return combined.includes(term) && bloodOk && statusOk && urgencyOk;
+            });
+        }
+
+        function displayRequests() {
+            const list = document.getElementById('requestsList');
+            list.innerHTML = '';
+
+            const filtered = useBackend ? requests : getFilteredRequests();
+            const totalPages = useBackend
+                ? Math.max(1, requestsPaginationMeta.totalPages || 1)
+                : Math.max(1, Math.ceil(filtered.length / requestPageSize));
+            if (!useBackend && requestPage > totalPages) requestPage = totalPages;
+            const paged = useBackend
+                ? filtered
+                : filtered.slice((requestPage - 1) * requestPageSize, (requestPage - 1) * requestPageSize + requestPageSize);
+
+            document.getElementById('requestsPageInfo').textContent = `Page ${requestPage} of ${totalPages}`;
+
+            if (paged.length === 0) {
+                list.innerHTML = '<li class="donor-item">No requests found</li>';
+                return;
+            }
+
+            paged.forEach(request => {
+                const id = getEntityId(request);
+                const currentStatus = request.status || 'pending';
+                const safeId = id.replace(/[^a-zA-Z0-9_-]/g, '_');
+                const li = document.createElement('li');
+                li.className = 'donor-item';
+                li.innerHTML = `
+                    <div class="donor-name">
+                        <span class="blood-type-badge">${request.bloodType}</span>
+                        ${request.patientName}
+                    </div>
+                    <div class="donor-details">
+                        ${request.units} unit(s) | ${request.hospital} | ${request.urgency || 'Normal'}
+                    </div>
+                    <div class="donor-details donor-item-actions">
+                        <select id="request-status-${safeId}">
+                            <option value="pending" ${currentStatus === 'pending' ? 'selected' : ''}>pending</option>
+                            <option value="approved" ${currentStatus === 'approved' ? 'selected' : ''}>approved</option>
+                            <option value="fulfilled" ${currentStatus === 'fulfilled' ? 'selected' : ''}>fulfilled</option>
+                            <option value="rejected" ${currentStatus === 'rejected' ? 'selected' : ''}>rejected</option>
+                        </select>
+                        <button type="button" class="btn btn-success" data-action="save-request-status" data-id="${id}">Update Status</button>
+                    </div>
                 `;
                 list.appendChild(li);
             });
@@ -904,23 +1657,115 @@
 
         function setupSearchFunctionality() {
             document.getElementById('searchInventory').addEventListener('input', function(e) {
-                const searchTerm = e.target.value.toUpperCase();
-                const rows = document.querySelectorAll('#inventoryTableBody tr');
+                inventorySearchTerm = e.target.value || '';
+                displayInventory();
+            });
 
-                rows.forEach(row => {
-                    const bloodType = row.cells[0].textContent;
-                    row.style.display = bloodType.includes(searchTerm) ? '' : 'none';
-                });
+            document.getElementById('inventoryStatusFilter').addEventListener('change', function(e) {
+                inventoryStatusFilter = e.target.value;
+                displayInventory();
             });
 
             document.getElementById('searchDonors').addEventListener('input', function(e) {
-                const searchTerm = e.target.value.toLowerCase();
-                const donorItems = document.querySelectorAll('.donor-item');
+                donorSearchTerm = e.target.value || '';
+                donorPage = 1;
+                if (useBackend) {
+                    fetchDonorsPage().then(displayDonors).catch(err => showAlert('manageDonorAlert', err.message, 'danger'));
+                } else {
+                    displayDonors();
+                }
+            });
 
-                donorItems.forEach(item => {
-                    const text = item.textContent.toLowerCase();
-                    item.style.display = text.includes(searchTerm) ? '' : 'none';
-                });
+            document.getElementById('filterDonorBloodType').addEventListener('change', function(e) {
+                donorBloodFilter = e.target.value || '';
+                donorPage = 1;
+                if (useBackend) {
+                    fetchDonorsPage().then(displayDonors).catch(err => showAlert('manageDonorAlert', err.message, 'danger'));
+                } else {
+                    displayDonors();
+                }
+            });
+
+            document.getElementById('filterDonorStatus').addEventListener('change', function(e) {
+                donorStatusFilter = e.target.value || '';
+                donorPage = 1;
+                if (useBackend) {
+                    fetchDonorsPage().then(displayDonors).catch(err => showAlert('manageDonorAlert', err.message, 'danger'));
+                } else {
+                    displayDonors();
+                }
+            });
+
+            document.getElementById('searchRequests').addEventListener('input', function(e) {
+                requestSearchTerm = e.target.value || '';
+                requestPage = 1;
+                if (useBackend) {
+                    fetchRequestsPage().then(displayRequests).catch(err => showAlert('manageRequestAlert', err.message, 'danger'));
+                } else {
+                    displayRequests();
+                }
+            });
+
+            document.getElementById('filterRequestBloodType').addEventListener('change', function(e) {
+                requestBloodFilter = e.target.value || '';
+                requestPage = 1;
+                if (useBackend) {
+                    fetchRequestsPage().then(displayRequests).catch(err => showAlert('manageRequestAlert', err.message, 'danger'));
+                } else {
+                    displayRequests();
+                }
+            });
+
+            document.getElementById('filterRequestStatus').addEventListener('change', function(e) {
+                requestStatusFilter = e.target.value || '';
+                requestPage = 1;
+                if (useBackend) {
+                    fetchRequestsPage().then(displayRequests).catch(err => showAlert('manageRequestAlert', err.message, 'danger'));
+                } else {
+                    displayRequests();
+                }
+            });
+
+            document.getElementById('filterRequestUrgency').addEventListener('change', function(e) {
+                requestUrgencyFilter = e.target.value || '';
+                requestPage = 1;
+                if (useBackend) {
+                    fetchRequestsPage().then(displayRequests).catch(err => showAlert('manageRequestAlert', err.message, 'danger'));
+                } else {
+                    displayRequests();
+                }
+            });
+
+            document.getElementById('clearDonorFiltersBtn').addEventListener('click', function() {
+                donorSearchTerm = '';
+                donorBloodFilter = '';
+                donorStatusFilter = '';
+                donorPage = 1;
+                document.getElementById('searchDonors').value = '';
+                document.getElementById('filterDonorBloodType').value = '';
+                document.getElementById('filterDonorStatus').value = '';
+                if (useBackend) {
+                    fetchDonorsPage().then(displayDonors).catch(err => showAlert('manageDonorAlert', err.message, 'danger'));
+                } else {
+                    displayDonors();
+                }
+            });
+
+            document.getElementById('clearRequestFiltersBtn').addEventListener('click', function() {
+                requestSearchTerm = '';
+                requestBloodFilter = '';
+                requestStatusFilter = '';
+                requestUrgencyFilter = '';
+                requestPage = 1;
+                document.getElementById('searchRequests').value = '';
+                document.getElementById('filterRequestBloodType').value = '';
+                document.getElementById('filterRequestStatus').value = '';
+                document.getElementById('filterRequestUrgency').value = '';
+                if (useBackend) {
+                    fetchRequestsPage().then(displayRequests).catch(err => showAlert('manageRequestAlert', err.message, 'danger'));
+                } else {
+                    displayRequests();
+                }
             });
         }
 
@@ -945,6 +1790,7 @@
 
         function showAlert(elementId, message, type) {
             const alert = document.getElementById(elementId);
+            if (!alert) return;
             alert.className = `alert alert-${type} show`;
             alert.textContent = message;
 
@@ -954,16 +1800,9 @@
         }
 
         function showSection(section) {
-            const sections = {
-                donor: 0,
-                request: 1,
-                inventory: 2
-            };
-
+            const sections = { donor: 0, request: 1, inventory: 2 };
             const cards = document.querySelectorAll('.card');
-            if (cards[sections[section]]) {
-                cards[sections[section]].scrollIntoView({ behavior: 'smooth', block: 'center' });
-            }
+            if (cards[sections[section]]) cards[sections[section]].scrollIntoView({ behavior: 'smooth', block: 'center' });
         }
 
         function exportData() {
@@ -986,6 +1825,13 @@
     </script>
 </body>
 </html>
+
+
+
+
+
+
+
 
 
 
