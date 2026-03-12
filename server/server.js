@@ -7,11 +7,15 @@ const mongoose = require('mongoose');
 const cors = require('cors');
 const bodyParser = require('body-parser');
 const dotenv = require('dotenv');
+const bcrypt = require('bcryptjs');
+const jwt = require('jsonwebtoken');
 
 dotenv.config();
 
 const app = express();
 const PORT = process.env.PORT || 5000;
+const JWT_SECRET = process.env.JWT_SECRET || 'change-this-secret-in-production';
+const JWT_EXPIRES_IN = process.env.JWT_EXPIRES_IN || '7d';
 
 // Middleware
 app.use(cors());
@@ -146,10 +150,99 @@ const inventorySchema = new mongoose.Schema({
     timestamps: true
 });
 
+// User Schema
+const userSchema = new mongoose.Schema({
+    name: {
+        type: String,
+        required: true,
+        trim: true
+    },
+    email: {
+        type: String,
+        required: true,
+        unique: true,
+        trim: true,
+        lowercase: true
+    },
+    passwordHash: {
+        type: String,
+        required: true
+    },
+    role: {
+        type: String,
+        enum: ['admin', 'staff'],
+        default: 'staff'
+    },
+    lastLogin: Date
+}, {
+    timestamps: true
+});
+
 // Models
 const Donor = mongoose.model('Donor', donorSchema);
 const Request = mongoose.model('Request', requestSchema);
 const Inventory = mongoose.model('Inventory', inventorySchema);
+const User = mongoose.model('User', userSchema);
+
+// ==================== AUTH HELPERS ====================
+
+function sanitizeUser(user) {
+    return {
+        id: user._id,
+        name: user.name,
+        email: user.email,
+        role: user.role,
+        createdAt: user.createdAt,
+        updatedAt: user.updatedAt,
+        lastLogin: user.lastLogin
+    };
+}
+
+function createToken(user) {
+    return jwt.sign(
+        {
+            sub: user._id.toString(),
+            email: user.email,
+            role: user.role
+        },
+        JWT_SECRET,
+        { expiresIn: JWT_EXPIRES_IN }
+    );
+}
+
+function authenticateToken(req, res, next) {
+    const authHeader = req.headers.authorization || '';
+    const token = authHeader.startsWith('Bearer ') ? authHeader.slice(7) : null;
+
+    if (!token) {
+        return res.status(401).json({
+            success: false,
+            message: 'Authentication token is required'
+        });
+    }
+
+    try {
+        req.user = jwt.verify(token, JWT_SECRET);
+        next();
+    } catch (error) {
+        return res.status(401).json({
+            success: false,
+            message: 'Invalid or expired token'
+        });
+    }
+}
+
+function authorizeRoles(...roles) {
+    return (req, res, next) => {
+        if (!req.user || !roles.includes(req.user.role)) {
+            return res.status(403).json({
+                success: false,
+                message: 'Access denied for this role'
+            });
+        }
+        next();
+    };
+}
 
 // ==================== ROUTES ====================
 
@@ -160,6 +253,130 @@ app.get('/', (req, res) => {
         status: 'Running',
         version: '1.0.0'
     });
+});
+
+// ========== AUTH ROUTES ==========
+
+app.post('/api/auth/register', async (req, res) => {
+    try {
+        const { name, email, password, role } = req.body;
+
+        if (!name || !email || !password) {
+            return res.status(400).json({
+                success: false,
+                message: 'Name, email and password are required'
+            });
+        }
+
+        if (password.length < 6) {
+            return res.status(400).json({
+                success: false,
+                message: 'Password must be at least 6 characters long'
+            });
+        }
+
+        const existingUser = await User.findOne({ email: email.toLowerCase().trim() });
+        if (existingUser) {
+            return res.status(409).json({
+                success: false,
+                message: 'User already exists with this email'
+            });
+        }
+
+        const passwordHash = await bcrypt.hash(password, 10);
+        const user = await User.create({
+            name: name.trim(),
+            email: email.toLowerCase().trim(),
+            passwordHash,
+            role: role === 'admin' ? 'admin' : 'staff'
+        });
+
+        const token = createToken(user);
+        res.status(201).json({
+            success: true,
+            message: 'User registered successfully',
+            data: {
+                user: sanitizeUser(user),
+                token
+            }
+        });
+    } catch (error) {
+        res.status(400).json({
+            success: false,
+            message: 'Error registering user',
+            error: error.message
+        });
+    }
+});
+
+app.post('/api/auth/login', async (req, res) => {
+    try {
+        const { email, password } = req.body;
+        if (!email || !password) {
+            return res.status(400).json({
+                success: false,
+                message: 'Email and password are required'
+            });
+        }
+
+        const user = await User.findOne({ email: email.toLowerCase().trim() });
+        if (!user) {
+            return res.status(401).json({
+                success: false,
+                message: 'Invalid email or password'
+            });
+        }
+
+        const isValidPassword = await bcrypt.compare(password, user.passwordHash);
+        if (!isValidPassword) {
+            return res.status(401).json({
+                success: false,
+                message: 'Invalid email or password'
+            });
+        }
+
+        user.lastLogin = new Date();
+        await user.save();
+
+        const token = createToken(user);
+        res.json({
+            success: true,
+            message: 'Login successful',
+            data: {
+                user: sanitizeUser(user),
+                token
+            }
+        });
+    } catch (error) {
+        res.status(500).json({
+            success: false,
+            message: 'Error logging in',
+            error: error.message
+        });
+    }
+});
+
+app.get('/api/auth/me', authenticateToken, async (req, res) => {
+    try {
+        const user = await User.findById(req.user.sub);
+        if (!user) {
+            return res.status(404).json({
+                success: false,
+                message: 'User not found'
+            });
+        }
+
+        res.json({
+            success: true,
+            data: sanitizeUser(user)
+        });
+    } catch (error) {
+        res.status(500).json({
+            success: false,
+            message: 'Error fetching user profile',
+            error: error.message
+        });
+    }
 });
 
 // ========== DONOR ROUTES ==========
@@ -206,7 +423,7 @@ app.get('/api/donors/:id', async (req, res) => {
 });
 
 // Register new donor
-app.post('/api/donors', async (req, res) => {
+app.post('/api/donors', authenticateToken, authorizeRoles('admin', 'staff'), async (req, res) => {
     try {
         const donor = new Donor(req.body);
         await donor.save();
@@ -229,7 +446,7 @@ app.post('/api/donors', async (req, res) => {
 });
 
 // Update donor
-app.put('/api/donors/:id', async (req, res) => {
+app.put('/api/donors/:id', authenticateToken, authorizeRoles('admin', 'staff'), async (req, res) => {
     try {
         const donor = await Donor.findByIdAndUpdate(
             req.params.id,
@@ -259,7 +476,7 @@ app.put('/api/donors/:id', async (req, res) => {
 });
 
 // Delete donor
-app.delete('/api/donors/:id', async (req, res) => {
+app.delete('/api/donors/:id', authenticateToken, authorizeRoles('admin'), async (req, res) => {
     try {
         const donor = await Donor.findByIdAndDelete(req.params.id);
         
@@ -326,7 +543,7 @@ app.get('/api/requests', async (req, res) => {
 });
 
 // Create blood request
-app.post('/api/requests', async (req, res) => {
+app.post('/api/requests', authenticateToken, authorizeRoles('admin', 'staff'), async (req, res) => {
     try {
         // Check inventory availability
         const inventory = await Inventory.findOne({ bloodType: req.body.bloodType });
@@ -365,7 +582,7 @@ app.post('/api/requests', async (req, res) => {
 });
 
 // Update request status
-app.put('/api/requests/:id', async (req, res) => {
+app.put('/api/requests/:id', authenticateToken, authorizeRoles('admin', 'staff'), async (req, res) => {
     try {
         const request = await Request.findByIdAndUpdate(
             req.params.id,
@@ -445,7 +662,7 @@ app.get('/api/inventory/:bloodType', async (req, res) => {
 });
 
 // Update inventory manually
-app.put('/api/inventory/:bloodType', async (req, res) => {
+app.put('/api/inventory/:bloodType', authenticateToken, authorizeRoles('admin'), async (req, res) => {
     try {
         const inventory = await Inventory.findOneAndUpdate(
             { bloodType: req.params.bloodType },
@@ -473,7 +690,7 @@ app.put('/api/inventory/:bloodType', async (req, res) => {
 // ========== STATISTICS ROUTES ==========
 
 // Get dashboard statistics
-app.get('/api/stats', async (req, res) => {
+app.get('/api/stats', authenticateToken, authorizeRoles('admin', 'staff'), async (req, res) => {
     try {
         const totalDonors = await Donor.countDocuments();
         const totalRequests = await Request.countDocuments();
